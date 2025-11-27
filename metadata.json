@@ -1,0 +1,8 @@
+{
+  "name": "AgriVision_Ai_model_2.0",
+  "description": "An advanced, cinematic AI-powered crop analysis application for modern farmers.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
