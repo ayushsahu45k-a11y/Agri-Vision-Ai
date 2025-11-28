@@ -1,8 +1,13 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { Language } from "../types";
 
+// IMPORTANT: Browser apps cannot use process.env directly.
+// Vite exposes environment variables ONLY if they start with VITE_
+// So set your key in Vercel as:   VITE_API_KEY
+const apiKey = import.meta.env.VITE_API_KEY;
+
 // Initialize Gemini
-const ai = new GoogleGenerativeAI(process.env.API_KEY as string);
+const ai = new GoogleGenerativeAI(apiKey);
 
 const MODEL_FLASH = "gemini-2.5-flash";
 
@@ -13,8 +18,8 @@ export const fileToGenerativePart = async (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onloadend = () => {
-      const base64String = reader.result as string;
-      resolve(base64String.split(",")[1]);
+      const base64 = (reader.result as string).split(",")[1];
+      resolve(base64);
     };
     reader.onerror = reject;
     reader.readAsDataURL(file);
@@ -47,22 +52,17 @@ ${
 
     const model = ai.getGenerativeModel({
       model: MODEL_FLASH,
-      generationConfig: {
-        responseMimeType: "application/json",
-      },
+      generationConfig: { responseMimeType: "application/json" },
     });
 
-    const response = await model.generateContent([
+    const result = await model.generateContent([
       {
-        inlineData: {
-          mimeType: mimeType,
-          data: base64Image,
-        },
+        inlineData: { mimeType, data: base64Image },
       },
       { text: promptText },
     ]);
 
-    return JSON.parse(response.response.text());
+    return JSON.parse(result.response.text());
   } catch (error) {
     console.error("Analysis Error:", error);
     throw error;
@@ -80,17 +80,16 @@ export const getTreatmentPlan = async (
   try {
     const model = ai.getGenerativeModel({ model: MODEL_FLASH });
 
-    const response = await model.generateContent(
-      `My ${crop} crop is diagnosed with: ${diagnosis}.
+    const prompt = `My ${crop} crop is diagnosed with: ${diagnosis}.
 Rules:
 1. Max 50 words
 2. Only bullet points
 3. Must be actionable
-${lang === "hi" ? "Reply ONLY in Hindi." : ""}
-`
-    );
+${lang === "hi" ? "Reply ONLY in Hindi." : ""}`;
 
-    return response.response.text();
+    const res = await model.generateContent(prompt);
+
+    return res.response.text();
   } catch (error) {
     console.error("Treatment Error:", error);
     return lang === "hi"
@@ -118,8 +117,8 @@ export const chatWithAssistant = async (
       }`,
     });
 
-    const response = await chat.sendMessage(message);
-    return response.response.text();
+    const res = await chat.sendMessage(message);
+    return res.response.text();
   } catch (error) {
     console.error("Chat Error:", error);
     return lang === "hi"
