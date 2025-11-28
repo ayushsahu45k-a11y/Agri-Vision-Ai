@@ -1,25 +1,23 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenAI, Type } from "@google/genai";
 import { Language } from "../types";
 
-// IMPORTANT: Browser apps cannot use process.env directly.
-// Vite exposes environment variables ONLY if they start with VITE_
-// So set your key in Vercel as:   VITE_API_KEY
-const apiKey = import.meta.env.VITE_API_KEY;
+// Initialize the client. API_KEY is injected by the environment.
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-// Initialize Gemini
-const ai = new GoogleGenerativeAI(apiKey);
-
-const MODEL_FLASH = "gemini-2.5-flash";
+// Constants for model selection
+const MODEL_FLASH = 'gemini-2.5-flash';
 
 /**
- * Convert File → Base64
+ * Helper to convert file to base64 for Gemini
  */
 export const fileToGenerativePart = async (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onloadend = () => {
-      const base64 = (reader.result as string).split(",")[1];
-      resolve(base64);
+      const base64String = reader.result as string;
+      // Remove data url prefix (e.g. "data:image/jpeg;base64,")
+      const base64Data = base64String.split(',')[1];
+      resolve(base64Data);
     };
     reader.onerror = reject;
     reader.readAsDataURL(file);
@@ -27,42 +25,62 @@ export const fileToGenerativePart = async (file: File): Promise<string> => {
 };
 
 /**
- * Analyze Crop Image
+ * Analyzes crop image
  */
-export const analyzeCropImage = async (
-  base64Image: string,
-  mimeType: string,
-  lang: Language
-) => {
+export const analyzeCropImage = async (base64Image: string, mimeType: string, lang: Language) => {
   try {
-    const promptText = `Analyze this crop/leaf image and return JSON only.
+    const promptText = `Analyze this image of a plant/crop leaf. 
+            Identify the crop type.
+            Assess the health condition (Healthy, Disease Detected, or Nutrient Deficiency).
+            Provide a health score from 0 to 100.
+            Provide a diagnosis summary.
+            Provide detailed reasoning for the diagnosis.
+            
+            ${lang === 'hi' ? 'IMPORTANT: Provide "diagnosis" and "reasoning" values in HINDI language.' : 'Provide details in English.'}
 
-Fields:
-- cropDetected
-- condition (Healthy | Disease Detected | Nutrient Deficiency | Unknown)
-- healthScore (0-100)
-- diagnosis
-- reasoning
+            Return the result in valid JSON format matching this schema:
+            {
+              "cropDetected": "string",
+              "condition": "Healthy" | "Disease Detected" | "Nutrient Deficiency" | "Unknown",
+              "healthScore": number,
+              "diagnosis": "string",
+              "reasoning": "string"
+            }`;
 
-${
-  lang === "hi"
-    ? 'IMPORTANT: "diagnosis" and "reasoning" must be in HINDI only.'
-    : "Reply in English."
-}`;
-
-    const model = ai.getGenerativeModel({
+    const response = await ai.models.generateContent({
       model: MODEL_FLASH,
-      generationConfig: { responseMimeType: "application/json" },
+      contents: {
+        parts: [
+          {
+            inlineData: {
+              mimeType: mimeType,
+              data: base64Image
+            }
+          },
+          {
+            text: promptText
+          }
+        ]
+      },
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            cropDetected: { type: Type.STRING },
+            condition: { type: Type.STRING, enum: ["Healthy", "Disease Detected", "Nutrient Deficiency", "Unknown"] },
+            healthScore: { type: Type.NUMBER },
+            diagnosis: { type: Type.STRING },
+            reasoning: { type: Type.STRING }
+          }
+        }
+      }
     });
 
-    const result = await model.generateContent([
-      {
-        inlineData: { mimeType, data: base64Image },
-      },
-      { text: promptText },
-    ]);
-
-    return JSON.parse(result.response.text());
+    if (response.text) {
+      return JSON.parse(response.text);
+    }
+    throw new Error("No response text generated");
   } catch (error) {
     console.error("Analysis Error:", error);
     throw error;
@@ -70,59 +88,49 @@ ${
 };
 
 /**
- * Generate Treatment Plan
+ * Get detailed treatment plan ("AI-Analysis-with-US")
  */
-export const getTreatmentPlan = async (
-  diagnosis: string,
-  crop: string,
-  lang: Language
-) => {
+export const getTreatmentPlan = async (diagnosis: string, crop: string, lang: Language) => {
   try {
-    const model = ai.getGenerativeModel({ model: MODEL_FLASH });
-
-    const prompt = `My ${crop} crop is diagnosed with: ${diagnosis}.
-Rules:
-1. Max 50 words
-2. Only bullet points
-3. Must be actionable
-${lang === "hi" ? "Reply ONLY in Hindi." : ""}`;
-
-    const res = await model.generateContent(prompt);
-
-    return res.response.text();
+    const response = await ai.models.generateContent({
+      model: MODEL_FLASH,
+      contents: `My ${crop} has been diagnosed with: ${diagnosis}. 
+      Provide a treatment plan.
+      STRICT RULES:
+      1. Maximum 50 words total.
+      2. Use bullet points only.
+      3. Be direct and actionable.
+      ${lang === 'hi' ? 'IMPORTANT: Please reply strictly in HINDI.' : ''}`,
+    });
+    return response.text;
   } catch (error) {
-    console.error("Treatment Error:", error);
-    return lang === "hi"
-      ? "उपचार योजना बनाने में समस्या।"
-      : "Unable to generate treatment plan.";
+    console.error("Treatment Plan Error:", error);
+    return lang === 'hi' ? "उपचार योजना बनाने में असमर्थ।" : "Unable to generate treatment plan at this time.";
   }
 };
 
 /**
  * Chat with AI Assistant
  */
-export const chatWithAssistant = async (
-  history: { role: "user" | "model"; text: string }[],
-  message: string,
-  lang: Language
-) => {
+export const chatWithAssistant = async (history: {role: 'user' | 'model', text: string}[], message: string, lang: Language) => {
   try {
-    const chat = ai.getGenerativeModel({ model: MODEL_FLASH }).startChat({
-      history: history.map((h) => ({
+    const chat = ai.chats.create({
+      model: MODEL_FLASH,
+      history: history.map(h => ({
         role: h.role,
-        parts: [{ text: h.text }],
+        parts: [{ text: h.text }]
       })),
-      systemInstruction: `You are AgriBot, an expert agriculture assistant. ${
-        lang === "hi" ? "Reply in Hindi only." : "Reply in English."
-      }`,
+      config: {
+        systemInstruction: `You are an expert agricultural AI assistant named AgriBot. You help farmers with crop management, weather advice, and pest control. 
+        ${lang === 'hi' ? 'Reply strictly in HINDI language.' : 'Reply in English.'}
+        Be concise, helpful, and friendly.`
+      }
     });
 
-    const res = await chat.sendMessage(message);
-    return res.response.text();
+    const result = await chat.sendMessage({ message });
+    return result.text;
   } catch (error) {
     console.error("Chat Error:", error);
-    return lang === "hi"
-      ? "कनेक्शन त्रुटि। कृपया पुनः प्रयास करें।"
-      : "Connection error. Try again.";
+    return lang === 'hi' ? "कनेक्शन त्रुटि। कृपया पुनः प्रयास करें।" : "Connection error. Please try again.";
   }
 };

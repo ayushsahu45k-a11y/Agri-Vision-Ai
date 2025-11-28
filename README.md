@@ -1,20 +1,56 @@
-<div align="center">
-<!-- <img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" /> -->
-</div>
+# AgriVision AI
 
-# Run and deploy Our app
+An advanced, cinematic AI-powered crop analysis application for modern farmers.
 
-This contains everything you need to run your app locally.
+## 🚀 How to Deploy (Get a Live URL)
 
-View your app in AI Studio: https://ai.studio/apps/drive/1K6EV7K47kaSCUNkLffKSXvw94KQxIKvW
+You can deploy this application for free using **Vercel**.
 
-## Run Locally
+### Prerequisites
+1. A [GitHub](https://github.com) account.
+2. A [Vercel](https://vercel.com) account.
+3. A Google Gemini API Key from [Google AI Studio](https://aistudio.google.com/app/apikey).
 
-**Prerequisites:**  Node.js
+### Steps
 
+1.  **Push to GitHub**
+    *   Initialize a git repository in this folder: `git init`
+    *   Add files: `git add .`
+    *   Commit: `git commit -m "Initial commit"`
+    *   Create a new repo on GitHub and push your code there.
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to Our API key
-3. Run the app:
-   `npm run dev`
+2.  **Deploy on Vercel**
+    *   Go to your Vercel Dashboard.
+    *   Click **"Add New..."** > **"Project"**.
+    *   Select your `AgriVision_Ai` repository.
+    *   **Framework Preset**: Vercel should automatically detect **Vite**. If not, select it manually.
+    *   **Environment Variables**:
+        *   Expand the "Environment Variables" section.
+        *   Key: `API_KEY`
+        *   Value: `YOUR_ACTUAL_GOOGLE_API_KEY_HERE`
+    *   Click **Deploy**.
+
+3.  **Done!**
+    *   Vercel will build your project and give you a live URL (e.g., `https://agrivision.vercel.app`).
+
+## 🛠️ Local Development
+
+To run this project locally:
+
+1.  Install dependencies:
+    ```bash
+    npm install
+    ```
+
+2.  Create a `.env` file in the root directory:
+    ```env
+    API_KEY=your_api_key_here
+    ```
+
+3.  Start the development server:
+    ```bash
+    npm run dev
+    ```
+
+## 🔑 Admin Access
+*   **Admin Key**: `admin123`
