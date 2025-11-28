@@ -1,4 +1,4 @@
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { Language } from "../types";
 
 // Initialize the client. API_KEY is injected by the environment.
